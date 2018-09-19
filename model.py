@@ -15,12 +15,13 @@ def fanin_init(size, fanin=None):
 class Actor(nn.Module):
     def __init__(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3, layer_norm = False):
         super(Actor, self).__init__()
+        self.layer_norm = layer_norm
         self.fc1 = nn.Linear(nb_states, hidden1)
         self.fc2 = nn.Linear(hidden1, hidden2)
         self.fc3 = nn.Linear(hidden2, nb_actions)
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
-        if layer_norm :
+        if self.layer_norm :
             self.LN1 = nn.LayerNorm(hidden1)
             self.LN2 = nn.LayerNorm(hidden2)
         
@@ -34,11 +35,11 @@ class Actor(nn.Module):
     
     def forward(self, x):
         out = self.fc1(x)
-        if layer_norm :
+        if self.layer_norm :
             out = self.LN1(out)
         out = self.relu(out)
         out = self.fc2(out)
-        if layer_norm :
+        if self.layer_norm :
             out = self.LN2(out)
         out = self.relu(out)
         out = self.fc3(out)
@@ -48,11 +49,12 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3, layer_norm = False):
         super(Critic, self).__init__()
+        self.layer_norm = layer_norm
         self.fc1 = nn.Linear(nb_states, hidden1)
         self.fc2 = nn.Linear(hidden1+nb_actions, hidden2)
         self.fc3 = nn.Linear(hidden2, 1)
         self.relu = nn.ReLU()
-        if layer_norm :
+        if self.layer_norm :
             self.LN1 = nn.LayerNorm(hidden1)
             self.LN2 = nn.LayerNorm(hidden2)
         
@@ -66,9 +68,13 @@ class Critic(nn.Module):
     def forward(self, xs):
         x, a = xs
         out = self.fc1(x)
+        if self.layer_norm :
+            out = self.LN1(out)
         out = self.relu(out)
         # debug()
         out = self.fc2(torch.cat([out,a],1))
+        if self.layer_norm :
+            out = self.LN2(out)
         out = self.relu(out)
         out = self.fc3(out)
         return out
