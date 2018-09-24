@@ -16,14 +16,21 @@ def to_tensor(ndarray, requires_grad=False, dtype=torch.float, use_cuda = None):
     if use_cuda : tensor = tensor.cuda()
     return tensor
 
+def SGLD_update(net,lr,coef):
+    scale = (lr*coef)**0.5
+    for param in net.parameters():
+        #param.data.copy_( param.data + scale*torch.randn(param.shape) )
+        param.data.copy_( param.data + scale*torch.cuda.FloatTensor(param.shape).normal_())
+      
+
 def soft_update(target, source, tau):
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 def hard_update(target, source):
     for target_param, param in zip(target.parameters(), source.parameters()):
-        target_param.data.copy_(param.data)
-
+        target_param.data.copy_(param.data)        
+        
 def get_output_folder(parent_dir, env_name):
     """Return save folder.
     Assumes folders in the parent_dir have suffix -run{run

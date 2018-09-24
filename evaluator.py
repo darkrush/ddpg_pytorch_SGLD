@@ -9,7 +9,7 @@ from utils import *
 
 
 class Evaluator(object):
-    def __init__(self, env,num_episodes = 10, max_episode_length=None,load_dir = None):
+    def __init__(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True):
     
         self.env = env
         self.actor = None
@@ -18,6 +18,10 @@ class Evaluator(object):
         self.action_scale = (env.action_space.high - env.action_space.low)/2.0
         self.action_bias = (env.action_space.high + env.action_space.low)/2.0
         self.load_dir = load_dir
+        self.apply_norm = apply_norm
+        if self.apply_norm :
+            self.norm_mean = None
+            self.norm_var = None
         
     def build_actor(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3, layer_norm = False):
         self.actor = Actor(nb_states = nb_states, nb_actions = nb_actions, hidden1=hidden1, hidden2=hidden2, init_w=init_w, layer_norm = layer_norm)
@@ -34,9 +38,16 @@ class Evaluator(object):
         self.actor = load_state_dict(
             torch.load('{}/actor.pkl'.format(load_dir))
         )
-
+    def update_norm(self,param):
+        mean, var = param
+        self.norm_mean = mean
+        self.norm_var = var
+        
     def __get_action(self, observation):
-        action = to_numpy(self.actor(to_tensor(np.array([observation]),use_cuda = False))).squeeze(0)
+        obs = to_tensor(np.array([observation]),use_cuda = False)
+        if self.apply_norm :
+            obs = (obs-self.norm_mean)/torch.sqrt(self.norm_var)
+        action = to_numpy(self.actor(obs)).squeeze(0)
         action = np.clip(action, -1., 1.)
         return action * self.action_scale + self.action_bias
         
@@ -72,7 +83,7 @@ class Evaluator(object):
             result.append(episode_reward)
 
         result = np.array(result).reshape(-1,1)
-        return result.mean(),result.var()
+        return result.mean(),result.std(ddof = 1)
     
     def __del__(self):
         self.env.close()
