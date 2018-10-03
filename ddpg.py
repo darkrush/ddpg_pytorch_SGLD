@@ -12,7 +12,7 @@ from utils import *
 
 class DDPG(object):
     def __init__(self, nb_actions, nb_states, layer_norm, obs_norm,
-                 actor_lr, critic_lr,SGLD_coef,noise_decay, batch_size,
+                 actor_lr, critic_lr,SGLD_coef,noise_decay,lr_decay, batch_size,
                  discount, tau, pool_size,
                  parameters_noise, action_noise):
                  
@@ -28,8 +28,10 @@ class DDPG(object):
         self.critic_lr = critic_lr
         self.actor_lr = actor_lr
         self.SGLD_coef = SGLD_coef
-        self.epsilon = 1
+        self.noise_coef = 1
         self.noise_decay = noise_decay
+        self.lr_coef = 1
+        self.lr_decay = lr_decay
 
         self.actor = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
         self.actor_target = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
@@ -95,7 +97,7 @@ class DDPG(object):
         value_loss = nn.functional.mse_loss(q_batch, target_q_batch)
         value_loss.backward()
         self.critic_optim.step()
-        SGLD_update(self.critic, self.critic_lr,self.SGLD_coef)
+        SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
         # Actor update
         self.actor.zero_grad()
 
@@ -112,6 +114,15 @@ class DDPG(object):
         soft_update(self.actor_target, self.actor, self.tau)
         soft_update(self.critic_target, self.critic, self.tau)
         return value_loss.item(),policy_loss.item()
+
+    def apply_lr_decay(self):
+        if self.lr_decay > 0:
+            self.lr_coef = self.lr_decay*self.lr_coef/(self.lr_coef+self.lr_decay)
+            self.critic_optim.param_groups[0]['lr'] = self.critic_lr * self.lr_coef
+        
+    def apply_noise_decay(self):
+        if self.noise_decay > 0:
+            self.noise_coef = self.noise_decay*self.noise_coef/(self.noise_coef+self.noise_decay)
         
     def select_action(self,random = False, s_t = None, if_noise = True):
         if random :
@@ -124,8 +135,7 @@ class DDPG(object):
             action = to_numpy(self.actor(tensor_state)).squeeze(0)
 
             if if_noise & (self.action_noise is not None):
-                action += self.is_training*max(self.epsilon, 0)*self.action_noise()
-                self.epsilon = self.noise_decay*self.epsilon/(self.epsilon+self.noise_decay)
+                action += self.is_training*max(self.noise_coef, 0)*self.action_noise()
         action = np.clip(action, -1., 1.)
         self.a_t = action
         return action

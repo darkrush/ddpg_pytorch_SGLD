@@ -14,7 +14,7 @@ class Evaluator(object):
         self.env = env
         self.actor = None
         self.num_episodes = num_episodes
-        self.max_episode_length = max_episode_length
+        self.max_episode_length = 1000
         self.action_scale = (env.action_space.high - env.action_space.low)/2.0
         self.action_bias = (env.action_space.high + env.action_space.low)/2.0
         self.load_dir = load_dir
