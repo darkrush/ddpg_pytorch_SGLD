@@ -97,7 +97,7 @@ class DDPG(object):
         value_loss = nn.functional.mse_loss(q_batch, target_q_batch)
         value_loss.backward()
         self.critic_optim.step()
-        SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
+        #SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
         # Actor update
         self.actor.zero_grad()
 
@@ -109,7 +109,8 @@ class DDPG(object):
         policy_loss = policy_loss.mean()
         policy_loss.backward()
         self.actor_optim.step()
-
+        SGLD_update(self.actor, self.actor_lr*self.lr_coef,self.SGLD_coef)
+        
         # Target update
         soft_update(self.actor_target, self.actor, self.tau)
         soft_update(self.critic_target, self.critic, self.tau)
@@ -175,6 +176,33 @@ class DDPG(object):
         actor,target = self.agent_pool.get_actor()
         self.actor.load_state_dict(actor)
         self.actor_target.load_state_dict(target)
+    
+    def append_critic(self):
+        self.agent_pool.critic_append(self.critic.state_dict(),self.critic_target.state_dict())
+        
+    def pick_critic(self):
+        critic,target = self.agent_pool.get_critic()
+        self.critic.load_state_dict(critic)
+        self.critic_target.load_state_dict(target)
+        
+    def append_agent(self,mode = 3):
+        if mode == 1:
+            self.append_actor()
+        elif mode ==2:
+            self.append_critic()
+        elif mode ==3:
+            self.append_actor()
+            self.append_critic()
+
+    def pick_agent(self,mode = 3):
+        if mode == 1:
+            self.pick_actor()
+        elif mode ==2:
+            self.pick_critic()
+        elif mode ==3:
+            self.pick_actor()
+            self.pick_critic()
+
         
     def reset(self, obs):
         self.s_t = obs

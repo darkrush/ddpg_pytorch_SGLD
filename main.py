@@ -12,7 +12,7 @@ from evaluator import Evaluator
 from noise import *
 from utils import *
 
-def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_steps, warmup, output_dir, obs_norm,eval_visualize ,tb_writer = None, max_episode_length=None, actor_pool = False ):
+def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_steps, warmup, output_dir, obs_norm,eval_visualize ,tb_writer = None, max_episode_length=None, pool_mode = 0 ):
 
     evaluator = Evaluator(eval_env,num_episodes = 10, max_episode_length = max_episode_length ,load_dir = output_dir, apply_norm = obs_norm)
     log_data_dict = {}
@@ -28,8 +28,8 @@ def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb
     episode_reward = 0.
     observation = deepcopy(env.reset())
     agent.reset(observation)
-    if actor_pool :
-        agent.append_actor()
+    agent.append_agent(pool_mode)
+        
     for t_warmup in range(warmup):
         action = agent.select_action(random = True)
         observation2, reward, done, info = env.step(action * action_scale + action_bias)
@@ -52,8 +52,7 @@ def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb
         for cycle in range(nb_cycles_per_epoch):
             totoal_cycle+=1
             #pick actor
-            if actor_pool :
-                agent.pick_actor()
+            agent.pick_agent(pool_mode)
             for t_rollout in range(nb_rollout_steps):        
                 # agent pick action ...
                 action = agent.select_action(random = False, s_t = observation, if_noise = True)
@@ -93,8 +92,7 @@ def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb
             log_data_dict['actor_loss_mean'].append([al_mean, totoal_cycle])
             tb_writer.add_scalar( 'critic_loss_mean', cl_mean, totoal_cycle)
             log_data_dict['critic_loss_mean'].append([cl_mean, totoal_cycle])
-            if actor_pool :
-                agent.append_actor()
+            agent.append_agent(pool_mode)
         evaluator.load_module(io.BytesIO(agent.get_actor_buffer().getvalue()))
         if obs_norm :
             evaluator.update_norm(agent.get_norm_param())
@@ -132,12 +130,14 @@ if __name__ == "__main__":
     parser.set_defaults(obs_norm=False)
     parser.add_argument('--eval-visualize', dest='eval_visualize', action='store_true',help='enable render in evaluation progress')
     parser.set_defaults(eval_visualize=False)
-    parser.add_argument('--nb-epoch', default=500, type=int, help='number of epochs')
+    parser.add_argument('--nb-epoch', default=250, type=int, help='number of epochs')
     parser.add_argument('--nb-cycles-per-epoch', default=20, type=int, help='number of cycles per epoch')
     parser.add_argument('--nb-rollout-steps', default=100, type=int, help='number rollout steps')
     parser.add_argument('--nb-train-steps', default=50, type=int, help='number train steps')
     parser.add_argument('--max-episode-length', default=1000, type=int, help='max steps in one episode')
     parser.add_argument('--pool-size', default=10, type=int, help='agent pool size, 0 means no agent pool')
+    parser.add_argument('--pool-mode', default=0, type=int, help='agent pool mode, 0: no pool, 1: actor pool only, 2: critic pool only, 3: both actor & critic')
+    
     args = parser.parse_args()
     
     output_dir = get_output_folder(args.output, args.env)
@@ -161,5 +161,5 @@ if __name__ == "__main__":
      
     train(agent = agent, env = env,eval_env = eval_env,
           nb_epoch = args.nb_epoch, nb_cycles_per_epoch =  args.nb_cycles_per_epoch, nb_rollout_steps =  args.nb_rollout_steps, nb_train_steps = args.nb_train_steps,
-          warmup = args.warmup,output_dir = output_dir, obs_norm = args.obs_norm,eval_visualize = args.eval_visualize,tb_writer = tb_writer, max_episode_length=args.max_episode_length,actor_pool = args.pool_size>0)
+          warmup = args.warmup,output_dir = output_dir, obs_norm = args.obs_norm,eval_visualize = args.eval_visualize,tb_writer = tb_writer, max_episode_length=args.max_episode_length,pool_mode = args.pool_mode)
     tb_writer.close()

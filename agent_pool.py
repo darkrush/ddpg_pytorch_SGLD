@@ -30,6 +30,14 @@ class Agent_pool(object):
             self.critic_item_nb = self.critic_item_nb+1
         return self.critic_next_id
     
+    def agent_append(self,actor_state_dict,target_actor_state_dict,critic_state_dict,target_critic_state_dict):
+        assert self.actor_next_id == self.critic_next_id 
+        actor_next_id = self.actor_append(actor_state_dict,target_actor_state_dict)
+        critic_next_id = self.critic_append(critic_state_dict,target_critic_state_dict)
+        assert actor_next_id==critic_next_id
+        return actor_next_id
+        
+    
     def get_actor(self,if_random = True, id = None):
         if if_random :
             id = random.randint(0,self.actor_item_nb-1)
@@ -45,3 +53,6 @@ class Agent_pool(object):
            if id is None:
                id = (self.critic_next_id-1)%self.size
         return self.critic_buffer[id],self.target_critic_buffer[id]
+        
+    def get_agent(self,if_random = True, id = None):
+        return self.get_actor(if_random,id),self.get_critic(if_random,id)
