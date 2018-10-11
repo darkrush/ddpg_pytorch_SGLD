@@ -144,23 +144,14 @@ class DDPG(object):
 
     
     def load_weights(self, output): 
-        self.actor.load_state_dict(
-            torch.load('{}/actor.pkl'.format(output))
-        )
-
-        self.critic.load_state_dict(
-            torch.load('{}/critic.pkl'.format(output))
-        )
+        self.actor  = torch.load('{}/actor.pkl'.format(output) )
+        self.critic = torch.load('{}/critic.pkl'.format(output))
         
     def save_model(self, output):
-        torch.save(
-            self.actor.state_dict(),
-            '{}/actor.pkl'.format(output)
-        )
-        torch.save(
-            self.critic.state_dict(),
-            '{}/critic.pkl'.format(output)
-        )
+        torch.save(self.actor ,'{}/actor.pkl'.format(output) )
+        torch.save(self.critic,'{}/critic.pkl'.format(output))
+        return '{}/actor.pkl'.format(output),'{}/critic.pkl'.format(output)
+        
     def get_actor_buffer(self):
         buffer = io.BytesIO()
         torch.save(self.actor, buffer)
