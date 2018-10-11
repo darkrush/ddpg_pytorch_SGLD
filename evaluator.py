@@ -6,7 +6,7 @@ import gym
 
 from model import Actor
 from utils import *
-
+from logger import Singleton_logger
 
 class Evaluator(object):
     def __init__(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True):
@@ -23,8 +23,8 @@ class Evaluator(object):
             self.norm_mean = None
             self.norm_var = None
         
-    def build_actor(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3, layer_norm = False):
-        self.actor = Actor(nb_states = nb_states, nb_actions = nb_actions, hidden1=hidden1, hidden2=hidden2, init_w=init_w, layer_norm = layer_norm)
+    #def build_actor(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3, layer_norm = False):
+    #    self.actor = Actor(nb_states = nb_states, nb_actions = nb_actions, hidden1=hidden1, hidden2=hidden2, init_w=init_w, layer_norm = layer_norm)
         
     def load_module(self, buffer):
         # load module(not only parameter, do not need build_actor before)
@@ -35,9 +35,8 @@ class Evaluator(object):
         if load_dir is None:
             load_dir = self.load_dir
         assert load_dir is not None
-        self.actor = load_state_dict(
-            torch.load('{}/actor.pkl'.format(load_dir))
-        )
+        self.actor = torch.load('{}/actor.pkl'.format(load_dir), map_location=torch.device('cpu'))
+        
     def update_norm(self,param):
         mean, var = param
         self.norm_mean = mean
@@ -51,7 +50,7 @@ class Evaluator(object):
         action = np.clip(action, -1., 1.)
         return action * self.action_scale + self.action_bias
         
-    def __call__(self, visualize=False):
+    def __call__(self,totoal_cycle, visualize=False):
         assert self.actor is not None
         observation = None
         result = []
@@ -83,8 +82,12 @@ class Evaluator(object):
             result.append(episode_reward)
 
         result = np.array(result).reshape(-1,1)
-        return result.mean(),result.std(ddof = 1)
-    
+        result_mean = result.mean()
+        result_std = result.std(ddof = 1)
+        Singleton_logger.add_scalar( 'eval_reward_mean',result_mean, totoal_cycle)
+        Singleton_logger.add_scalar( 'eval_reward_std',result_std, totoal_cycle)
+
+        
     def __del__(self):
         self.env.close()
         
