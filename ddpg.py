@@ -61,7 +61,8 @@ class DDPG(object):
         
         if USE_CUDA:
             self.cuda()
-
+        
+        self.stamper = None
         
         
         
@@ -74,7 +75,10 @@ class DDPG(object):
         
     def update(self):
         # Sample batch
+        if self.stamper is not None :self.stamper.start('batch_sample')
         batch = self.memory.sample(self.batch_size)
+        if self.stamper is not None :self.stamper.end('batch_sample')
+        if self.stamper is not None :self.stamper.start('q_target')
         tensor_obs0 = to_tensor(batch['obs0'])
         tensor_obs1 = to_tensor(batch['obs1'])
         if self.obs_norm:
@@ -90,30 +94,56 @@ class DDPG(object):
         
             target_q_batch = to_tensor(batch['rewards']) + \
                 self.discount*to_tensor(1-batch['terminals1'].astype(np.float))*next_q_values
+        if self.stamper is not None :self.stamper.end('q_target')
+        
         # Critic update
+        if self.stamper is not None :self.stamper.start('c_train')
+        if self.stamper is not None :self.stamper.start('c_zero')
         self.critic.zero_grad()
-
+        if self.stamper is not None :self.stamper.end('c_zero')
+        if self.stamper is not None :self.stamper.start('c_critic')
         q_batch = self.critic([tensor_obs0, to_tensor(batch['actions']) ])
+        if self.stamper is not None :self.stamper.end('c_critic')
+        if self.stamper is not None :self.stamper.start('c_BP')
         value_loss = nn.functional.mse_loss(q_batch, target_q_batch)
         value_loss.backward()
+        if self.stamper is not None :self.stamper.end('c_BP')
+        if self.stamper is not None :self.stamper.start('c_Adam')
         self.critic_optim.step()
+        if self.stamper is not None :self.stamper.end('c_Adam')
         #SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
+        if self.stamper is not None :self.stamper.end('c_train')
+        
+        
+        
         # Actor update
+        if self.stamper is not None :self.stamper.start('a_train')
+        if self.stamper is not None :self.stamper.start('a_zero')
         self.actor.zero_grad()
-
+        if self.stamper is not None :self.stamper.end('a_zero')
+        if self.stamper is not None :self.stamper.start('a_critic')
         policy_loss = -self.critic([
             tensor_obs0,
             self.actor(tensor_obs0)
         ])
-        
+        if self.stamper is not None :self.stamper.end('a_critic')
+        if self.stamper is not None :self.stamper.start('a_BP')
         policy_loss = policy_loss.mean()
         policy_loss.backward()
+        if self.stamper is not None :self.stamper.end('a_BP')
+        if self.stamper is not None :self.stamper.start('a_Adam')
         self.actor_optim.step()
+        if self.stamper is not None :self.stamper.end('a_Adam')
+        if self.stamper is not None :self.stamper.start('a_SGLD')
         SGLD_update(self.actor, self.actor_lr*self.lr_coef,self.SGLD_coef)
+        if self.stamper is not None :self.stamper.end('a_SGLD')
+        if self.stamper is not None :self.stamper.end('a_train')
         
         # Target update
+        if self.stamper is not None :self.stamper.start('soft_update')
         soft_update(self.actor_target, self.actor, self.tau)
         soft_update(self.critic_target, self.critic, self.tau)
+        if self.stamper is not None :self.stamper.end('soft_update')
         return value_loss.item(),policy_loss.item()
 
     def apply_lr_decay(self):

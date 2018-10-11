@@ -20,8 +20,10 @@ def SGLD_update(net,lr,coef):
     scale = (lr*coef)**0.5
     for param in net.parameters():
         #param.data.copy_( param.data + scale*torch.randn(param.shape) )
-        param.data.copy_( param.data + scale*torch.cuda.FloatTensor(param.shape).normal_())
-      
+        if USE_CUDA :
+            param.data.copy_( param.data + scale*torch.cuda.FloatTensor(param.shape).normal_())
+        else :
+            param.data.copy_( param.data + scale*torch.FloatTensor(param.shape).normal_())
 
 def soft_update(target, source, tau):
     for target_param, param in zip(target.parameters(), source.parameters()):
