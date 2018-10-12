@@ -3,13 +3,13 @@ from utils import *
 
 
 class Run_Normalizer():
-    def __init__(self, shape):
+    def __init__(self, shape, if_cuda):
         self.n = torch.zeros(shape,dtype = torch.float)
         self.mean = torch.zeros(shape,dtype = torch.float)
         self.mean_diff = torch.zeros(shape,dtype = torch.float)
         self.var = torch.zeros(shape,dtype = torch.float)
-        self.if_cuda = USE_CUDA
-        if USE_CUDA:
+        self.if_cuda = if_cuda
+        if if_cuda:
             self.cuda()
 
     def observe(self, x):

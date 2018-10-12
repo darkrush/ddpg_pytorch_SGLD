@@ -1,3 +1,4 @@
+from multiprocessing import Process,Queue
 import numpy as np
 import argparse
 import io
@@ -8,14 +9,13 @@ import torch
 import gym
 
 from logger import Singleton_logger
+from evaluator import Singleton_evaluator
 from ddpg import DDPG
-from evaluator import Evaluator
 from noise import *
 from utils import *
 
-def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_steps, warmup, output_dir, obs_norm,eval_visualize, max_episode_length=None, pool_mode = 0 ):
 
-    evaluator = Evaluator(eval_env,num_episodes = 10, max_episode_length = max_episode_length ,load_dir = output_dir, apply_norm = obs_norm)
+def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_steps, warmup, output_dir, obs_norm, max_episode_length=None, pool_mode = 0 ):
 
     action_scale = (env.action_space.high - env.action_space.low)/2.0
     action_bias = (env.action_space.high + env.action_space.low)/2.0
@@ -82,9 +82,9 @@ def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb
                 al_list.append(al)
             al_mean = np.mean(al_list)
             cl_mean = np.mean(cl_list)
-            Singleton_logger.add_scalar('train_episode_reward',train_episode_reward, totoal_cycle)
-            Singleton_logger.add_scalar( 'actor_loss_mean', al_mean, totoal_cycle)
-            Singleton_logger.add_scalar( 'critic_loss_mean', cl_mean, totoal_cycle)
+            Singleton_logger.trigger_log('train_episode_reward',train_episode_reward, totoal_cycle)
+            Singleton_logger.trigger_log( 'actor_loss_mean', al_mean, totoal_cycle)
+            Singleton_logger.trigger_log( 'critic_loss_mean', cl_mean, totoal_cycle)
 
             agent.append_agent(pool_mode)
 
@@ -93,12 +93,9 @@ def train( agent, env,eval_env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb
         agent.apply_lr_decay()
         agent.save_model(output_dir)
         
-        evaluator.load_actor()
-        if obs_norm :
-            evaluator.update_norm(agent.get_norm_param())
-        evaluator(totoal_cycle = totoal_cycle, visualize = eval_visualize)
-        
-        Singleton_logger.save_dict()
+        Singleton_evaluator.trigger_eval_process(totoal_cycle = totoal_cycle)
+
+        Singleton_logger.trigger_save()
             
 if __name__ == "__main__":
     
@@ -134,19 +131,22 @@ if __name__ == "__main__":
     
     output_dir = get_output_folder(args.output, args.env)
     
-    Singleton_logger.set_dir(output_dir)
+    Singleton_logger.set_up(output_dir)
+    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm)
+    
+    eval_process = None
+    
     
     with open(os.path.join(output_dir,'args.txt'),'w') as f:
         print(args,file = f)
         
     env = gym.make(args.env)
-    eval_env = gym.make(args.env)
     nb_actions = env.action_space.shape[0]
     nb_states = env.observation_space.shape[0]
     action_noise = None
+    
     if args.action_noise:
         action_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(nb_actions), sigma=float(args.stddev) * np.ones(nb_actions))
-    
 
     
     agent = DDPG(nb_actions = nb_actions,nb_states = nb_states, layer_norm = True, obs_norm = args.obs_norm,
@@ -154,8 +154,9 @@ if __name__ == "__main__":
                  discount = args.discount, tau = args.tau, pool_size = args.pool_size,
                  parameters_noise = None, action_noise = action_noise)
      
-    train(agent = agent, env = env,eval_env = eval_env,
+    train(agent = agent, env = env,
           nb_epoch = args.nb_epoch, nb_cycles_per_epoch =  args.nb_cycles_per_epoch, nb_rollout_steps =  args.nb_rollout_steps, nb_train_steps = args.nb_train_steps,
-          warmup = args.warmup,output_dir = output_dir, obs_norm = args.obs_norm,eval_visualize = args.eval_visualize, max_episode_length=args.max_episode_length,pool_mode = args.pool_mode)
+          warmup = args.warmup,output_dir = output_dir, obs_norm = args.obs_norm, max_episode_length=args.max_episode_length,pool_mode = args.pool_mode)
           
-    Singleton_logger.close()
+    Singleton_evaluator.trigger_close()
+    Singleton_logger.trigger_close()
