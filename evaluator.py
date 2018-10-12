@@ -4,53 +4,54 @@ import argparse
 import gym.spaces
 import gym
 
+
 from model import Actor
 from utils import *
+
+from multiprocessing import Process, Queue
 from logger import Singleton_logger
 
 class Evaluator(object):
-    def __init__(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True):
-    
-        self.env = env
+    def __init__(self):
+        self.env = None
         self.actor = None
+        self.obs_norm = None
+        
+    def set_up(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True, multi_process = True, logger = True):
+        self.env_name = env
         self.num_episodes = num_episodes
         self.max_episode_length = 1000
-        self.action_scale = (env.action_space.high - env.action_space.low)/2.0
-        self.action_bias = (env.action_space.high + env.action_space.low)/2.0
         self.load_dir = load_dir
         self.apply_norm = apply_norm
-        if self.apply_norm :
-            self.norm_mean = None
-            self.norm_var = None
+        self.multi_process = multi_process
+        self.logger = logger
         
-    #def build_actor(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3, layer_norm = False):
-    #    self.actor = Actor(nb_states = nb_states, nb_actions = nb_actions, hidden1=hidden1, hidden2=hidden2, init_w=init_w, layer_norm = layer_norm)
+        if multi_process :
+            self.queue = Queue(maxsize = 1)
+            self.sub_process = Process(target = self.start_eval_process,args = (self.queue,))
+            self.sub_process.start()
+
         
     def load_module(self, buffer):
-        # load module(not only parameter, do not need build_actor before)
         self.actor = torch.load(buffer,map_location=torch.device('cpu'))
         
-    def load_actor(self,load_dir = None):
-        # load module parameter(only parameter, need build_actor before)
+    def __load_actor(self,load_dir = None):
         if load_dir is None:
             load_dir = self.load_dir
         assert load_dir is not None
         self.actor = torch.load('{}/actor.pkl'.format(load_dir), map_location=torch.device('cpu'))
-        
-    def update_norm(self,param):
-        mean, var = param
-        self.norm_mean = mean
-        self.norm_var = var
-        
+        if self.apply_norm:
+            self.obs_norm = torch.load('{}/obs_norm.pkl'.format(output), map_location=torch.device('cpu'))
+    
     def __get_action(self, observation):
         obs = to_tensor(np.array([observation]),use_cuda = False)
         if self.apply_norm :
-            obs = (obs-self.norm_mean)/torch.sqrt(self.norm_var)
+            obs = self.obs_norm(obs)
         action = to_numpy(self.actor(obs)).squeeze(0)
         action = np.clip(action, -1., 1.)
         return action * self.action_scale + self.action_bias
         
-    def __call__(self,totoal_cycle, visualize=False):
+    def __run_eval(self,totoal_cycle, visualize=False):
         assert self.actor is not None
         observation = None
         result = []
@@ -84,13 +85,42 @@ class Evaluator(object):
         result = np.array(result).reshape(-1,1)
         result_mean = result.mean()
         result_std = result.std(ddof = 1)
-        Singleton_logger.add_scalar( 'eval_reward_mean',result_mean, totoal_cycle)
-        Singleton_logger.add_scalar( 'eval_reward_std',result_std, totoal_cycle)
+        if self.logger :
+            Singleton_logger.trigger_log( 'eval_reward_mean',result_mean, totoal_cycle)
+            Singleton_logger.trigger_log( 'eval_reward_std',result_std, totoal_cycle)
+        print("eval : cycle {:<5d}\treward mean {:.2f}\treward std {:.2f}".format(totoal_cycle,result_mean,result_std))
 
+    def load_and_run(self,totoal_cycle):
+        self.__load_actor()
+        self.__run_eval(totoal_cycle)
         
+    def trigger_eval_process(self,totoal_cycle):
+        self.queue.put(totoal_cycle,block = False)
+        
+    def trigger_close(self):
+        self.queue.put(-1,block = True)
+        
+    def start_eval_process(self,queue):
+        
+        self.env = gym.make(self.env_name)
+        self.action_scale = (self.env.action_space.high - self.env.action_space.low)/2.0
+        self.action_bias = (self.env.action_space.high + self.env.action_space.low)/2.0
+        
+        while True:
+            item = queue.get(block = True)
+            if item < 0:
+                break
+            totoal_cycle = item
+            self.load_and_run(totoal_cycle)
+
     def __del__(self):
-        self.env.close()
-        
+        if self.env is not None:
+            self.env.close()
+    
+    
+Singleton_evaluator = Evaluator()
+
+'''
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Eval DDPG')
@@ -108,3 +138,4 @@ if __name__ == "__main__":
     eval.build_actor(nb_states, nb_actions)
     mean,var = eval(visualize = True)
     print(mean,var)
+'''
