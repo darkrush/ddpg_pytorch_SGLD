@@ -1,21 +1,6 @@
 import torch
 import os
 
-USE_CUDA = torch.cuda.is_available()
-
-
-def to_numpy(var, use_cuda = None):
-    if use_cuda is None:
-        use_cuda = USE_CUDA
-    return var.cpu().data.numpy() if use_cuda else var.data.numpy()
-
-def to_tensor(ndarray, requires_grad=False, dtype=torch.float, use_cuda = None):
-    if use_cuda is None:
-        use_cuda = USE_CUDA
-    tensor = torch.tensor(data = ndarray, dtype = dtype, requires_grad = requires_grad)
-    if use_cuda : tensor = tensor.cuda()
-    return tensor
-
 def SGLD_update(net,lr,coef):
     scale = (lr*coef)**0.5
     for param in net.parameters():

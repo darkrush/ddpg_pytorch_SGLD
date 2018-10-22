@@ -13,7 +13,6 @@ class Run_Normalizer():
             self.cuda()
 
     def observe(self, x):
-        x = to_tensor(x,use_cuda = self.if_cuda)
         self.n += 1.
         last_mean = self.mean.clone()
         self.mean += (x-self.mean)/self.n
@@ -21,7 +20,6 @@ class Run_Normalizer():
         self.var = torch.clamp(self.mean_diff/self.n, min=1e-2)
 
     def normalize(self, inputs):
-        inputs = to_tensor(inputs,use_cuda = self.if_cuda)
         obs_std = torch.sqrt(self.var)
         return (inputs - self.mean)/obs_std
         

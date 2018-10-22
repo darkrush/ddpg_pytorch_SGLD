@@ -14,7 +14,7 @@ class DDPG(object):
     def __init__(self, nb_actions, nb_states, layer_norm, obs_norm,
                  actor_lr, critic_lr,SGLD_coef,noise_decay,lr_decay, batch_size,
                  discount, tau, pool_size,
-                 parameters_noise, action_noise):
+                 parameters_noise, action_noise,with_cuda):
                  
         self.nb_actions = nb_actions
         self.nb_states = nb_states
@@ -32,24 +32,32 @@ class DDPG(object):
         self.noise_decay = noise_decay
         self.lr_coef = 1
         self.lr_decay = lr_decay
-
+        self.with_cuda = with_cuda
+        
         self.actor = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
         self.actor_target = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
-        #self.actor_optim  = SGD(self.actor.parameters(), lr=actor_lr, momentum=0.9,weight_decay  = 0.01)
-        self.actor_optim  = Adam(self.actor.parameters(), lr=actor_lr)
-        hard_update(self.actor_target,self.actor)
-        
         self.critic = Critic(nb_states, nb_actions, layer_norm = self.layer_norm)
         self.critic_target = Critic(nb_states, nb_actions, layer_norm = self.layer_norm)
-        #self.critic_optim  = SGD(self.critic.parameters(), lr=critic_lr, momentum=0.9,weight_decay  = 0.01)
-        self.critic_optim  = Adam(self.critic.parameters(), lr=critic_lr)
+        if self.with_cuda:
+            self.actor.cuda()
+            self.actor_target.cuda()
+            self.critic.cuda()
+            self.critic_target.cuda()
+
+
+        hard_update(self.actor_target,self.actor)
         hard_update(self.critic_target,self.critic)
         
+        #self.actor_optim  = SGD(self.actor.parameters(), lr=actor_lr, momentum=0.9,weight_decay  = 0.01)
+        self.actor_optim  = Adam(self.actor.parameters(), lr=actor_lr)
+        #self.critic_optim  = SGD(self.critic.parameters(), lr=critic_lr, momentum=0.9,weight_decay  = 0.01)
+        self.critic_optim  = Adam(self.critic.parameters(), lr=critic_lr)
         
-        self.memory = Memory(int(1e6), (nb_actions,), (nb_states,))
+        
+        self.memory = Memory(int(1e6), (nb_actions,), (nb_states,),with_cuda)
         self.obs_norm = obs_norm
         if self.obs_norm:
-            self.run_obs_norm = Run_Normalizer((nb_states,),USE_CUDA)
+            self.run_obs_norm = Run_Normalizer((nb_states,),self.with_cuda)
         self.is_training = True
         
         if self.pool_size>0:
@@ -58,10 +66,6 @@ class DDPG(object):
         self.s_t = None
         self.a_t = None
         
-        
-        if USE_CUDA:
-            self.cuda()
-
         
         
         
@@ -75,8 +79,9 @@ class DDPG(object):
     def update(self):
         # Sample batch
         batch = self.memory.sample(self.batch_size)
-        tensor_obs0 = to_tensor(batch['obs0'])
-        tensor_obs1 = to_tensor(batch['obs1'])
+
+        tensor_obs0 = batch['obs0']
+        tensor_obs1 = batch['obs1']
         if self.obs_norm:
             tensor_obs0 = self.run_obs_norm.normalize(tensor_obs0)
             tensor_obs1 = self.run_obs_norm.normalize(tensor_obs1)
@@ -88,12 +93,12 @@ class DDPG(object):
                 self.actor_target(tensor_obs1),
             ])
         
-            target_q_batch = to_tensor(batch['rewards']) + \
-                self.discount*to_tensor(1-batch['terminals1'])*next_q_values
+            target_q_batch = batch['rewards'] + \
+                self.discount*(1-batch['terminals1'])*next_q_values
         # Critic update
         self.critic.zero_grad()
 
-        q_batch = self.critic([tensor_obs0, to_tensor(batch['actions']) ])
+        q_batch = self.critic([tensor_obs0, batch['actions']])
         value_loss = nn.functional.mse_loss(q_batch, target_q_batch)
         value_loss.backward()
         self.critic_optim.step()
@@ -130,10 +135,13 @@ class DDPG(object):
             action = np.random.uniform(-1.,1.,self.nb_actions)
         else:
             if s_t is None: raise RuntimeError()
-            tensor_state = to_tensor(np.array([s_t]))
+            s_t = torch.tensor(s_t,dtype = torch.float32,requires_grad = False)
+            if self.with_cuda:
+                s_t = s_t.cuda()
             if self.obs_norm:
-                tensor_state = self.run_obs_norm.normalize(tensor_state)
-            action = to_numpy(self.actor(tensor_state)).squeeze(0)
+                s_t = self.run_obs_norm.normalize(s_t)
+            with torch.no_grad():
+                action = self.actor(s_t).cpu().numpy().squeeze(0)
 
             if if_noise & (self.action_noise is not None):
                 action += self.is_training*max(self.noise_coef, 0)*self.action_noise()
@@ -202,9 +210,3 @@ class DDPG(object):
         self.s_t = obs
         if self.action_noise is not None:
             self.action_noise.reset()
-    
-    def cuda(self):
-        self.actor.cuda()
-        self.actor_target.cuda()
-        self.critic.cuda()
-        self.critic_target.cuda()

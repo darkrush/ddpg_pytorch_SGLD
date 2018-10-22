@@ -46,10 +46,12 @@ class Evaluator(object):
             self.obs_norm = torch.load('{}/obs_norm.pkl'.format(output), map_location=torch.device('cpu'))
     
     def __get_action(self, observation):
-        obs = to_tensor(np.array([observation]),use_cuda = False)
+        obs = torch.tensor([observation],dtype = torch.float32,requires_grad = False)
         if self.apply_norm :
             obs = self.obs_norm(obs)
-        action = to_numpy(self.actor(obs)).squeeze(0)
+            
+        with torch.no_grad():
+            action = self.actor(obs).numpy().squeeze(0)
         action = np.clip(action, -1., 1.)
         return action * self.action_scale + self.action_bias
         

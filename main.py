@@ -51,7 +51,7 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
             agent.pick_agent(pool_mode)
             for t_rollout in range(nb_rollout_steps):        
                 # agent pick action ...
-                action = agent.select_action(random = False, s_t = observation, if_noise = True)
+                action = agent.select_action(random = False, s_t = [observation], if_noise = True)
                 
                 # env response with next_observation, reward, terminate_info
                 observation2, reward, done, info = env.step(action * action_scale + action_bias)
@@ -98,12 +98,13 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
         Singleton_logger.trigger_save()
             
 if __name__ == "__main__":
-    torch.backends.cudnn.deterministic = True
-    torch.manual_seed(0)
     
     parser = argparse.ArgumentParser(description='DDPG on pytorch')
     
     parser.add_argument('--env', default='HalfCheetah-v2', type=str, help='open-ai gym environment')
+    parser.add_argument('--rand_seed', default=-1, type=int, help='random_seed')
+    parser.add_argument('--nocuda', dest='with_cuda', action='store_false',help='disable cuda')
+    parser.set_defaults(with_cuda=True)
     parser.add_argument('--actor-lr', default=0.0001, type=float, help='actor net learning rate')
     parser.add_argument('--critic-lr', default=0.001, type=float, help='critic net learning rate')
     parser.add_argument('--SGLD-coef', default=0.0001, type=float, help='critic net learning rate')
@@ -131,6 +132,14 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
+    if not torch.cuda.is_available():
+        args.with_cuda = False
+    if args.rand_seed >= 0 :
+        if args.with_cuda:
+            torch.backends.cudnn.deterministic = True
+            torch.cuda.manual_seed_all(args.rand_seed)
+        torch.manual_seed(args.rand_seed)
+
     output_dir = get_output_folder(args.output, args.env)
     
     Singleton_logger.set_up(output_dir)
@@ -154,7 +163,7 @@ if __name__ == "__main__":
     agent = DDPG(nb_actions = nb_actions,nb_states = nb_states, layer_norm = True, obs_norm = args.obs_norm,
                  actor_lr = args.actor_lr, critic_lr = args.critic_lr,SGLD_coef = args.SGLD_coef,noise_decay = args.noise_decay,lr_decay = args.lr_decay, batch_size = args.batch_size,
                  discount = args.discount, tau = args.tau, pool_size = args.pool_size,
-                 parameters_noise = None, action_noise = action_noise)
+                 parameters_noise = None, action_noise = action_noise, with_cuda = args.with_cuda)
      
     train(agent = agent, env = env,
           nb_epoch = args.nb_epoch, nb_cycles_per_epoch =  args.nb_cycles_per_epoch, nb_rollout_steps =  args.nb_rollout_steps, nb_train_steps = args.nb_train_steps,
