@@ -16,8 +16,9 @@ class Evaluator(object):
         self.env = None
         self.actor = None
         self.obs_norm = None
+        self.visualize = False
         
-    def set_up(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True, multi_process = True, logger = True):
+    def set_up(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True, multi_process = True, logger = True,visualize = False):
         self.env_name = env
         self.num_episodes = num_episodes
         self.max_episode_length = 1000
@@ -25,6 +26,7 @@ class Evaluator(object):
         self.apply_norm = apply_norm
         self.multi_process = multi_process
         self.logger = logger
+        self.visualize = visualize
         
         if multi_process :
             self.queue = Queue(maxsize = 1)
@@ -51,7 +53,7 @@ class Evaluator(object):
         action = np.clip(action, -1., 1.)
         return action * self.action_scale + self.action_bias
         
-    def __run_eval(self,totoal_cycle, visualize=False):
+    def __run_eval(self,totoal_cycle):
         assert self.actor is not None
         observation = None
         result = []
@@ -73,7 +75,7 @@ class Evaluator(object):
                 if self.max_episode_length and episode_steps >= self.max_episode_length -1:
                     done = True
                 
-                if visualize & (episode == 0):
+                if self.visualize & (episode == 0):
                     self.env.render(mode='human')
 
                 # update

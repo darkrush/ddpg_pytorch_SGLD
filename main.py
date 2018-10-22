@@ -101,7 +101,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='DDPG on pytorch')
     
-    parser.add_argument('--env', default='Pendulum-v0', type=str, help='open-ai gym environment')
+    parser.add_argument('--env', default='HalfCheetah-v2', type=str, help='open-ai gym environment')
     parser.add_argument('--actor-lr', default=0.0001, type=float, help='actor net learning rate')
     parser.add_argument('--critic-lr', default=0.001, type=float, help='critic net learning rate')
     parser.add_argument('--SGLD-coef', default=0.0001, type=float, help='critic net learning rate')
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     output_dir = get_output_folder(args.output, args.env)
     
     Singleton_logger.set_up(output_dir)
-    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm)
+    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm,visualize = args.eval_visualize)
     
     eval_process = None
     
