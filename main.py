@@ -139,6 +139,7 @@ if __name__ == "__main__":
             torch.backends.cudnn.deterministic = True
             torch.cuda.manual_seed_all(args.rand_seed)
         torch.manual_seed(args.rand_seed)
+        np.random.seed(args.rand_seed)
 
     output_dir = get_output_folder(args.output, args.env)
     
@@ -152,9 +153,15 @@ if __name__ == "__main__":
         print(args,file = f)
         
     env = gym.make(args.env)
+    if args.rand_seed >= 0 :
+        env.seed(args.rand_seed)
+        
     nb_actions = env.action_space.shape[0]
     nb_states = env.observation_space.shape[0]
     action_noise = None
+    
+    
+    
     
     if args.action_noise:
         action_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(nb_actions), sigma=float(args.stddev) * np.ones(nb_actions))

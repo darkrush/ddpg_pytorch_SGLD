@@ -107,6 +107,7 @@ class Evaluator(object):
     def start_eval_process(self,queue):
         
         self.env = gym.make(self.env_name)
+        self.env.seed(0)
         self.action_scale = (self.env.action_space.high - self.env.action_space.low)/2.0
         self.action_bias = (self.env.action_space.high + self.env.action_space.low)/2.0
         

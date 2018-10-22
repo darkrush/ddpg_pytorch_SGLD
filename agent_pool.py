@@ -1,5 +1,4 @@
 import torch
-import random
 class Agent_pool(object):
     def __init__(self,size = 10):
         self.size = size
@@ -40,7 +39,7 @@ class Agent_pool(object):
     
     def get_actor(self,if_random = True, id = None):
         if if_random :
-            id = random.randint(0,self.actor_item_nb-1)
+            id = torch.randint(0,self.actor_item_nb-1,[1]).item()
         else:
            if id is None:
                id = (self.actor_next_id-1)%self.size
@@ -48,7 +47,7 @@ class Agent_pool(object):
 
     def get_critic(self,if_random = True, id = None):
         if if_random :
-            id = random.randint(0,self.critic_item_nb-1)
+            id = torch.randint(0,self.critic_item_nb-1,[1]).item()
         else:
            if id is None:
                id = (self.critic_next_id-1)%self.size
