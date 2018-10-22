@@ -89,7 +89,7 @@ class DDPG(object):
             ])
         
             target_q_batch = to_tensor(batch['rewards']) + \
-                self.discount*to_tensor(1-batch['terminals1'].astype(np.float))*next_q_values
+                self.discount*to_tensor(1-batch['terminals1'])*next_q_values
         # Critic update
         self.critic.zero_grad()
 

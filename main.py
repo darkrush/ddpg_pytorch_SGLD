@@ -33,7 +33,7 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
         if max_episode_length and episode_steps >= max_episode_length -1:
             done = True
         # agent observe and update policy
-        agent.store_transition(observation, action, reward, observation2, done)
+        agent.store_transition(observation, action,np.array([reward,]), observation2, np.array([done,],dtype = np.float32))
         observation = deepcopy(observation2)
         if done: # end of episode
             # reset
@@ -60,7 +60,7 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
                     done = True
                 
                 # agent observe and update policy
-                agent.store_transition(observation, action, reward, observation2, done)
+                agent.store_transition(observation, action, np.array([reward,]), observation2, np.array([done,],dtype = np.float32))
             # update 
                 step += 1
                 episode_steps += 1
@@ -98,6 +98,8 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
         Singleton_logger.trigger_save()
             
 if __name__ == "__main__":
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(0)
     
     parser = argparse.ArgumentParser(description='DDPG on pytorch')
     
