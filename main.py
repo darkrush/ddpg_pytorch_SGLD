@@ -122,7 +122,7 @@ if __name__ == "__main__":
     parser.set_defaults(obs_norm=False)
     parser.add_argument('--eval-visualize', dest='eval_visualize', action='store_true',help='enable render in evaluation progress')
     parser.set_defaults(eval_visualize=False)
-    parser.add_argument('--nb-epoch', default=250, type=int, help='number of epochs')
+    parser.add_argument('--nb-epoch', default=500, type=int, help='number of epochs')
     parser.add_argument('--nb-cycles-per-epoch', default=20, type=int, help='number of cycles per epoch')
     parser.add_argument('--nb-rollout-steps', default=100, type=int, help='number rollout steps')
     parser.add_argument('--nb-train-steps', default=50, type=int, help='number train steps')
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     output_dir = get_output_folder(args.output, args.env)
     
     Singleton_logger.set_up(output_dir)
-    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm,visualize = args.eval_visualize)
+    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm,visualize = args.eval_visualize, rand_seed = args.rand_seed)
     
     eval_process = None
     

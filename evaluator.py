@@ -3,7 +3,7 @@ import torch
 import argparse
 import gym.spaces
 import gym
-
+import time
 
 from model import Actor
 from utils import *
@@ -18,7 +18,7 @@ class Evaluator(object):
         self.obs_norm = None
         self.visualize = False
         
-    def set_up(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True, multi_process = True, logger = True,visualize = False):
+    def set_up(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True, multi_process = True, logger = True,visualize = False, rand_seed = -1):
         self.env_name = env
         self.num_episodes = num_episodes
         self.max_episode_length = 1000
@@ -27,7 +27,7 @@ class Evaluator(object):
         self.multi_process = multi_process
         self.logger = logger
         self.visualize = visualize
-        
+        self.rand_seed = rand_seed
         if multi_process :
             self.queue = Queue(maxsize = 1)
             self.sub_process = Process(target = self.start_eval_process,args = (self.queue,))
@@ -92,7 +92,8 @@ class Evaluator(object):
         if self.logger :
             Singleton_logger.trigger_log( 'eval_reward_mean',result_mean, totoal_cycle)
             Singleton_logger.trigger_log( 'eval_reward_std',result_std, totoal_cycle)
-        print("eval : cycle {:<5d}\treward mean {:.2f}\treward std {:.2f}".format(totoal_cycle,result_mean,result_std))
+        localtime = time.asctime( time.localtime(time.time()) )
+        print("{} eval : cycle {:<5d}\treward mean {:.2f}\treward std {:.2f}".format(localtime,totoal_cycle,result_mean,result_std))
 
     def load_and_run(self,totoal_cycle):
         self.__load_actor()
@@ -107,7 +108,8 @@ class Evaluator(object):
     def start_eval_process(self,queue):
         
         self.env = gym.make(self.env_name)
-        self.env.seed(0)
+        if self.rand_seed >= 0:
+            self.env.seed(self.rand_seed)
         self.action_scale = (self.env.action_space.high - self.env.action_space.low)/2.0
         self.action_bias = (self.env.action_space.high + self.env.action_space.low)/2.0
         

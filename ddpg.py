@@ -170,31 +170,44 @@ class DDPG(object):
         
     def get_norm_param(self):
         return self.run_obs_norm.mean.cpu(),self.run_obs_norm.var.cpu()
-    
+
+        
+        
+    #TODO recode agent pool
     def append_actor(self):
         self.agent_pool.actor_append(self.actor.state_dict(),self.actor_target.state_dict())
         
     def pick_actor(self):
-        actor,target = self.agent_pool.get_actor()
+        actor,actor_target = self.agent_pool.get_actor()
         self.actor.load_state_dict(actor)
-        self.actor_target.load_state_dict(target)
+        self.actor_target.load_state_dict(actor_target)
     
     def append_critic(self):
         self.agent_pool.critic_append(self.critic.state_dict(),self.critic_target.state_dict())
         
     def pick_critic(self):
-        critic,target = self.agent_pool.get_critic()
+        critic,critic_target = self.agent_pool.get_critic()
         self.critic.load_state_dict(critic)
-        self.critic_target.load_state_dict(target)
+        self.critic_target.load_state_dict(critic_target)
+    
+    def append_actor_critic(self):
+        self.agent_pool.actor_append(self.actor.state_dict(),self.actor_target.state_dict())
+        self.agent_pool.critic_append(self.critic.state_dict(),self.critic_target.state_dict())
         
+    def pick_actor_critic(self):
+        actor,actor_target,critic,critic_target = self.agent_pool.get_agent()
+        self.actor.load_state_dict(actor)
+        self.actor_target.load_state_dict(actor_target)
+        self.critic.load_state_dict(critic)
+        self.critic_target.load_state_dict(critic_target)
+    
     def append_agent(self,mode = 3):
         if mode == 1:
             self.append_actor()
         elif mode ==2:
             self.append_critic()
         elif mode ==3:
-            self.append_actor()
-            self.append_critic()
+            self.append_actor_critic()
 
     def pick_agent(self,mode = 3):
         if mode == 1:
@@ -202,8 +215,7 @@ class DDPG(object):
         elif mode ==2:
             self.pick_critic()
         elif mode ==3:
-            self.pick_actor()
-            self.pick_critic()
+            self.pick_actor_critic()
 
         
     def reset(self, obs):
