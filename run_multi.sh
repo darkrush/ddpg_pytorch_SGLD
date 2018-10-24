@@ -5,8 +5,11 @@ for env_name in $ENV_LIST
 do 
     for coef in $COEF_LIST
     do
-        python main.py --env $env_name --SGLD-coef $coef --noise-decay 0 --pool-size 10 --lr-decay 0 --pool-mode 3 -rand_seed 666
+        python main.py --env $env_name --SGLD-coef $coef --noise-decay 0 --pool-size 10 --lr-decay 0 --pool-mode 3 --rand_seed 666
         
     done
-        python main.py --env $env_name --SGLD-coef 0.0   --noise-decay 1 --pool-size 0  --lr-decay 0 --pool-mode 0  --action-noise -rand_seed 666
+    
+    python main.py --env $env_name --SGLD-coef 0.0   --noise-decay 1 --pool-size 0  --lr-decay 0 --pool-mode 0  --action-noise --rand_seed 666
+    
+    wait
 done
