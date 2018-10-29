@@ -28,6 +28,6 @@ for run_num in range(args.low,args.high+1):
         for r in reward_mean:
             smooth_reward.append(smooth_reward[-1]*args.smooth + r*(1-args.smooth))
         smooth_reward=smooth_reward[1:]
-        plt.plot(step,smooth_reward,label= args_dict['exp_name']+' SGLD_mode:'+args_dict['SGLD_mode']+' pool_mode:'+args_dict['pool_mode'])
+        plt.plot(step,smooth_reward,label= args_dict['exp_name']+' SGLD_mode:'+args_dict['SGLD_mode']+' SGLD_coef:'+args_dict['SGLD_coef']+' pool_mode:'+args_dict['pool_mode'])
 plt.legend()
 plt.show()
