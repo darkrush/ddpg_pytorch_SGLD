@@ -14,7 +14,7 @@ class DDPG(object):
     def __init__(self, nb_actions, nb_states, layer_norm, obs_norm,
                  actor_lr, critic_lr,SGLD_coef,noise_decay,lr_decay, batch_size,
                  discount, tau, pool_size,
-                 parameters_noise, action_noise,with_cuda):
+                 parameters_noise, action_noise,SGLD_mode,pool_mode,with_cuda):
                  
         self.nb_actions = nb_actions
         self.nb_states = nb_states
@@ -32,6 +32,8 @@ class DDPG(object):
         self.noise_decay = noise_decay
         self.lr_coef = 1
         self.lr_decay = lr_decay
+        self.SGLD_mode = SGLD_mode
+        self.pool_mode = pool_mode
         self.with_cuda = with_cuda
         
         self.actor = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
@@ -102,7 +104,8 @@ class DDPG(object):
         value_loss = nn.functional.mse_loss(q_batch, target_q_batch)
         value_loss.backward()
         self.critic_optim.step()
-        #SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
+        if (self.SGLD_mode == 2)or(self.SGLD_mode == 3):
+            SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
         # Actor update
         self.actor.zero_grad()
 
@@ -114,7 +117,8 @@ class DDPG(object):
         policy_loss = policy_loss.mean()
         policy_loss.backward()
         self.actor_optim.step()
-        SGLD_update(self.actor, self.actor_lr*self.lr_coef,self.SGLD_coef)
+        if (self.SGLD_mode == 1)or(self.SGLD_mode == 3):
+            SGLD_update(self.actor, self.actor_lr*self.lr_coef,self.SGLD_coef)
         
         # Target update
         soft_update(self.actor_target, self.actor, self.tau)
@@ -201,20 +205,20 @@ class DDPG(object):
         self.critic.load_state_dict(critic)
         self.critic_target.load_state_dict(critic_target)
     
-    def append_agent(self,mode = 3):
-        if mode == 1:
+    def append_agent(self):
+        if self.pool_mode == 1:
             self.append_actor()
-        elif mode ==2:
+        elif self.pool_mode ==2:
             self.append_critic()
-        elif mode ==3:
+        elif self.pool_mode ==3:
             self.append_actor_critic()
 
-    def pick_agent(self,mode = 3):
-        if mode == 1:
+    def pick_agent(self):
+        if self.pool_mode == 1:
             self.pick_actor()
-        elif mode ==2:
+        elif self.pool_mode ==2:
             self.pick_critic()
-        elif mode ==3:
+        elif self.pool_mode ==3:
             self.pick_actor_critic()
 
         

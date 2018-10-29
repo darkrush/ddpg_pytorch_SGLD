@@ -9,12 +9,15 @@ class Logger(object):
     def __init__(self):
         self.log_data_dict = {}
         self.output_dir = None
-        self.queue = Queue()
-        self.lock = Lock()
-    def set_up(self,output_dir):
+
+    def set_up(self,output_dir, multi_process = True):
         self.output_dir = output_dir
-        self.sub_process = Process(target = self.start_log,args = (self.queue,self.lock))
-        self.sub_process.start()
+        self.multi_process = multi_process
+        if self.multi_process:
+            self.queue = Queue()
+            self.lock = Lock()
+            self.sub_process = Process(target = self.start_log,args = (self.queue,self.lock))
+            self.sub_process.start()
         
     def add_scalar(self,name,y,x):
         if name not in self.log_data_dict:
@@ -26,13 +29,20 @@ class Logger(object):
             pickle.dump(self.log_data_dict,f)
             
     def trigger_close(self):
-        self.queue.put( ('__close__',0,0) ,block = True)
+        if self.multi_process:
+            self.queue.put( ('__close__',0,0) ,block = True)
             
     def trigger_log(self,name,y,x):
-        self.queue.put((name,y,x),block = True)
+        if self.multi_process:
+            self.queue.put((name,y,x),block = True)
+        else:
+            self.add_scalar(name,y,x)
         
     def trigger_save(self):
-        self.queue.put(('__save__',0,0),block = True)
+        if self.multi_process:
+            self.queue.put(('__save__',0,0),block = True)
+        else:
+            self.save_dict()
         
     def start_log(self,queue,lock):
         while True:

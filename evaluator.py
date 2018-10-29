@@ -28,30 +28,36 @@ class Evaluator(object):
         self.logger = logger
         self.visualize = visualize
         self.rand_seed = rand_seed
-        if multi_process :
+        if self.multi_process :
             self.queue = Queue(maxsize = 1)
             self.sub_process = Process(target = self.start_eval_process,args = (self.queue,))
             self.sub_process.start()
+        else :
+            self.env = gym.make(self.env_name)
+            if self.rand_seed >= 0:
+                self.env.seed(self.rand_seed)
+            self.action_scale = (self.env.action_space.high - self.env.action_space.low)/2.0
+            self.action_bias = (self.env.action_space.high + self.env.action_space.low)/2.0
 
         
     def load_module(self, buffer):
-        self.actor = torch.load(buffer,map_location=torch.device('cpu'))
+        self.actor = torch.load(buffer)
         
     def __load_actor(self,load_dir = None):
         if load_dir is None:
             load_dir = self.load_dir
         assert load_dir is not None
-        self.actor = torch.load('{}/actor.pkl'.format(load_dir), map_location=torch.device('cpu'))
+        self.actor = torch.load('{}/actor.pkl'.format(load_dir))
         if self.apply_norm:
-            self.obs_norm = torch.load('{}/obs_norm.pkl'.format(output), map_location=torch.device('cpu'))
+            self.obs_norm = torch.load('{}/obs_norm.pkl'.format(output))
     
     def __get_action(self, observation):
-        obs = torch.tensor([observation],dtype = torch.float32,requires_grad = False)
+        obs = torch.tensor([observation],dtype = torch.float32,requires_grad = False).cuda()
         if self.apply_norm :
             obs = self.obs_norm(obs)
             
         with torch.no_grad():
-            action = self.actor(obs).numpy().squeeze(0)
+            action = self.actor(obs).cpu().numpy().squeeze(0)
         action = np.clip(action, -1., 1.)
         return action * self.action_scale + self.action_bias
         
@@ -100,10 +106,14 @@ class Evaluator(object):
         self.__run_eval(totoal_cycle)
         
     def trigger_eval_process(self,totoal_cycle):
-        self.queue.put(totoal_cycle,block = False)
-        
+        if self.multi_process :
+            self.queue.put(totoal_cycle,block = False)
+        else :
+            self.load_and_run(totoal_cycle)
+
     def trigger_close(self):
-        self.queue.put(-1,block = True)
+        if self.multi_process :
+            self.queue.put(-1,block = True)
         
     def start_eval_process(self,queue):
         

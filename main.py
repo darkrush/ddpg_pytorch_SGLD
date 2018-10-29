@@ -15,7 +15,7 @@ from noise import *
 from utils import *
 
 
-def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_steps, warmup, output_dir, obs_norm, max_episode_length=None, pool_mode = 0 ):
+def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_steps, warmup, output_dir, obs_norm, max_episode_length=None):
 
     action_scale = (env.action_space.high - env.action_space.low)/2.0
     action_bias = (env.action_space.high + env.action_space.low)/2.0
@@ -24,7 +24,7 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
     episode_reward = 0.
     observation = deepcopy(env.reset())
     agent.reset(observation)
-    agent.append_agent(pool_mode)
+    agent.append_agent()
         
     for t_warmup in range(warmup):
         action = agent.select_action(random = True)
@@ -48,7 +48,7 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
         for cycle in range(nb_cycles_per_epoch):
             totoal_cycle+=1
             #pick actor
-            agent.pick_agent(pool_mode)
+            agent.pick_agent()
             for t_rollout in range(nb_rollout_steps):        
                 # agent pick action ...
                 action = agent.select_action(random = False, s_t = [observation], if_noise = True)
@@ -86,7 +86,7 @@ def train( agent, env, nb_epoch,nb_cycles_per_epoch,nb_rollout_steps,nb_train_st
             Singleton_logger.trigger_log( 'actor_loss_mean', al_mean, totoal_cycle)
             Singleton_logger.trigger_log( 'critic_loss_mean', cl_mean, totoal_cycle)
 
-            agent.append_agent(pool_mode)
+            agent.append_agent()
 
             
         agent.apply_noise_decay()
@@ -102,13 +102,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DDPG on pytorch')
     
     parser.add_argument('--env', default='HalfCheetah-v2', type=str, help='open-ai gym environment')
-    parser.add_argument('--rand_seed', default=-1, type=int, help='random_seed')
+    parser.add_argument('--rand_seed', default=666, type=int, help='random_seed')
     parser.add_argument('--nocuda', dest='with_cuda', action='store_false',help='disable cuda')
     parser.set_defaults(with_cuda=True)
     parser.add_argument('--actor-lr', default=0.0001, type=float, help='actor net learning rate')
     parser.add_argument('--critic-lr', default=0.001, type=float, help='critic net learning rate')
-    parser.add_argument('--SGLD-coef', default=0.0001, type=float, help='critic net learning rate')
+    parser.add_argument('--SGLD-mode', default=0, type=int, help='SGLD mode, 0: no SGLD, 1: actor sgld only, 2: critic sgld only, 3: both actor & critic')
+    parser.add_argument('--SGLD-coef', default=0.01, type=float, help='SGLD coef')
     parser.add_argument('--action-noise', dest='action_noise', action='store_true',help='enable action space noise')
+    parser.add_argument('--stddev', default=0.2, type=float, help='action noise stddev')
     parser.set_defaults(action_noise=False)
     parser.add_argument('--noise-decay', default=0, type=float, help='action noise decay')
     parser.add_argument('--lr-decay', default=0, type=float, help='critic lr decay')
@@ -117,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
     parser.add_argument('--warmup', default=100, type=int, help='time without training but only filling the replay memory')
     parser.add_argument('--output', default='result/', type=str, help='result output dir')
-    parser.add_argument('--stddev', default=0.2, type=float, help='action noise stddev')
+    parser.add_argument('--exp-name', default='', type=str, help='exp dir name')
     parser.add_argument('--obs-norm', dest='obs_norm', action='store_true',help='enable observation normalization')
     parser.set_defaults(obs_norm=False)
     parser.add_argument('--eval-visualize', dest='eval_visualize', action='store_true',help='enable render in evaluation progress')
@@ -127,8 +129,10 @@ if __name__ == "__main__":
     parser.add_argument('--nb-rollout-steps', default=100, type=int, help='number rollout steps')
     parser.add_argument('--nb-train-steps', default=50, type=int, help='number train steps')
     parser.add_argument('--max-episode-length', default=1000, type=int, help='max steps in one episode')
-    parser.add_argument('--pool-size', default=10, type=int, help='agent pool size, 0 means no agent pool')
     parser.add_argument('--pool-mode', default=0, type=int, help='agent pool mode, 0: no pool, 1: actor pool only, 2: critic pool only, 3: both actor & critic')
+    parser.add_argument('--pool-size', default=10, type=int, help='agent pool size, 0 means no agent pool')
+    parser.add_argument('--mp', dest='multi_process', action='store_true',help='enable multi process')
+    parser.set_defaults(multi_process=False)
     
     args = parser.parse_args()
     
@@ -141,10 +145,11 @@ if __name__ == "__main__":
         torch.manual_seed(args.rand_seed)
         np.random.seed(args.rand_seed)
 
-    output_dir = get_output_folder(args.output, args.env)
-    
-    Singleton_logger.set_up(output_dir)
-    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm,visualize = args.eval_visualize, rand_seed = args.rand_seed)
+    output_dir = get_output_folder(args.output, args.env, args.exp_name)
+
+        
+    Singleton_logger.set_up(output_dir,multi_process = args.multi_process)
+    Singleton_evaluator.set_up(args.env,num_episodes = 10, max_episode_length=args.max_episode_length,load_dir = output_dir, apply_norm = args.obs_norm,multi_process = args.multi_process,visualize = args.eval_visualize, rand_seed = args.rand_seed)
     
     eval_process = None
     
@@ -170,11 +175,11 @@ if __name__ == "__main__":
     agent = DDPG(nb_actions = nb_actions,nb_states = nb_states, layer_norm = True, obs_norm = args.obs_norm,
                  actor_lr = args.actor_lr, critic_lr = args.critic_lr,SGLD_coef = args.SGLD_coef,noise_decay = args.noise_decay,lr_decay = args.lr_decay, batch_size = args.batch_size,
                  discount = args.discount, tau = args.tau, pool_size = args.pool_size,
-                 parameters_noise = None, action_noise = action_noise, with_cuda = args.with_cuda)
+                 parameters_noise = None, action_noise = action_noise,SGLD_mode = args.SGLD_mode,pool_mode = args.pool_mode, with_cuda = args.with_cuda)
      
     train(agent = agent, env = env,
           nb_epoch = args.nb_epoch, nb_cycles_per_epoch =  args.nb_cycles_per_epoch, nb_rollout_steps =  args.nb_rollout_steps, nb_train_steps = args.nb_train_steps,
-          warmup = args.warmup,output_dir = output_dir, obs_norm = args.obs_norm, max_episode_length=args.max_episode_length,pool_mode = args.pool_mode)
+          warmup = args.warmup,output_dir = output_dir, obs_norm = args.obs_norm, max_episode_length=args.max_episode_length)
           
     Singleton_evaluator.trigger_close()
     Singleton_logger.trigger_close()
