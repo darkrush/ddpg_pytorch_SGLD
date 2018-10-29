@@ -39,19 +39,31 @@ class Agent_pool(object):
     
     def get_actor(self,if_random = True, id = None):
         if if_random :
-            id = torch.randint(0,self.actor_item_nb-1,[1]).item()
+            id = torch.randint(0,self.actor_item_nb,[1]).item()
         else:
-           if id is None:
-               id = (self.actor_next_id-1)%self.size
-        return self.actor_buffer[id],self.target_actor_buffer[id]
+            if id is None:
+                id = (self.actor_next_id-1)%self.size
+        return self.actor_buffer[int(id)],self.target_actor_buffer[int(id)]
 
     def get_critic(self,if_random = True, id = None):
         if if_random :
-            id = torch.randint(0,self.critic_item_nb-1,[1]).item()
+            id = torch.randint(0,self.critic_item_nb,[1]).item()
         else:
-           if id is None:
-               id = (self.critic_next_id-1)%self.size
+            if id is None:
+                id = (self.critic_next_id-1)%self.size
         return self.critic_buffer[id],self.target_critic_buffer[id]
         
     def get_agent(self,if_random = True, id = None):
-        return self.get_actor(if_random,id),self.get_critic(if_random,id)
+        if if_random :
+            id = torch.randint(0,self.critic_item_nb,[1]).item()
+        else:
+            if id is None:
+                id = (self.critic_next_id-1)%self.size
+        return self.actor_buffer[int(id)],self.target_actor_buffer[int(id)],self.critic_buffer[int(id)],self.target_critic_buffer[int(id)]
+        
+        
+        
+        
+        
+        
+        
