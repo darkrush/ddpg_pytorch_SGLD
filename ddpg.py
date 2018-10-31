@@ -8,11 +8,11 @@ from obs_norm import Run_Normalizer
 from model import Actor,Critic
 from memory import Memory
 from utils import *
-
-
+from sgld import SGLD
+from sghmc import SGHMC
 class DDPG(object):
     def __init__(self, nb_actions, nb_states, layer_norm, obs_norm,
-                 actor_lr, critic_lr,SGLD_coef,noise_decay,lr_decay, batch_size,
+                 actor_lr, critic_lr,num_pseudo_batches,l2_critic,noise_decay,lr_decay, batch_size,
                  discount, tau, pool_size,
                  parameters_noise, action_noise,SGLD_mode,pool_mode,with_cuda):
                  
@@ -27,14 +27,15 @@ class DDPG(object):
         self.pool_size = pool_size
         self.critic_lr = critic_lr
         self.actor_lr = actor_lr
-        self.SGLD_coef = SGLD_coef
         self.noise_coef = 1
         self.noise_decay = noise_decay
+        self.l2_critic = l2_critic
         self.lr_coef = 1
         self.lr_decay = lr_decay
         self.SGLD_mode = SGLD_mode
         self.pool_mode = pool_mode
         self.with_cuda = with_cuda
+        self.num_pseudo_batches = num_pseudo_batches
         
         self.actor = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
         self.actor_target = Actor(nb_states = self.nb_states, nb_actions = self.nb_actions, layer_norm = self.layer_norm)
@@ -50,12 +51,19 @@ class DDPG(object):
         hard_update(self.actor_target,self.actor)
         hard_update(self.critic_target,self.critic)
         
-        #self.actor_optim  = SGD(self.actor.parameters(), lr=actor_lr, momentum=0.9,weight_decay  = 0.01)
-        self.actor_optim  = Adam(self.actor.parameters(), lr=actor_lr)
-        #self.critic_optim  = SGD(self.critic.parameters(), lr=critic_lr, momentum=0.9,weight_decay  = 0.01)
-        self.critic_optim  = Adam(self.critic.parameters(), lr=critic_lr)
+        if (self.SGLD_mode == 1)or(self.SGLD_mode == 3):
+            self.actor_optim  = SGLD(self.actor.parameters(), lr=actor_lr/self.num_pseudo_batches, num_pseudo_batches = self.num_pseudo_batches, num_burn_in_steps = 1000)
+            #self.actor_optim  = SGHMC(self.actor.parameters(), lr=actor_lr, scale_grad = self.num_pseudo_batches, num_burn_in_steps = 1000)
+        else :
+            self.actor_optim  = Adam(self.actor.parameters(), lr=actor_lr)
+
+        if (self.SGLD_mode == 2)or(self.SGLD_mode == 3):
+            self.critic_optim  = SGLD(self.critic.parameters(), lr=critic_lr/self.num_pseudo_batches, num_pseudo_batches = self.num_pseudo_batches, num_burn_in_steps = 1000)
+            #self.critic_optim  = SGHMC(self.critic.parameters(), lr=critic_lr, scale_grad = self.num_pseudo_batches, num_burn_in_steps = 1000)
+        else:
+            self.critic_optim  = Adam(self.critic.parameters(), lr=critic_lr)
         
-        
+
         self.memory = Memory(int(1e6), (nb_actions,), (nb_states,),with_cuda)
         self.obs_norm = obs_norm
         if self.obs_norm:
@@ -102,10 +110,16 @@ class DDPG(object):
 
         q_batch = self.critic([tensor_obs0, batch['actions']])
         value_loss = nn.functional.mse_loss(q_batch, target_q_batch)
+        
+        l2_coef = torch.tensor(self.l2_critic).cuda()
+        l2_reg = torch.tensor(0.).cuda()
+        for name,param in self.critic.named_parameters():
+            if 'LN' not in name:
+                l2_reg += torch.norm(param)
+        value_loss += l2_coef*l2_reg
         value_loss.backward()
         self.critic_optim.step()
-        if (self.SGLD_mode == 2)or(self.SGLD_mode == 3):
-            SGLD_update(self.critic, self.critic_lr*self.lr_coef,self.SGLD_coef)
+        
         # Actor update
         self.actor.zero_grad()
 
@@ -117,8 +131,6 @@ class DDPG(object):
         policy_loss = policy_loss.mean()
         policy_loss.backward()
         self.actor_optim.step()
-        if (self.SGLD_mode == 1)or(self.SGLD_mode == 3):
-            SGLD_update(self.actor, self.actor_lr*self.lr_coef,self.SGLD_coef)
         
         # Target update
         soft_update(self.actor_target, self.actor, self.tau)

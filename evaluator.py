@@ -18,10 +18,10 @@ class Evaluator(object):
         self.obs_norm = None
         self.visualize = False
         
-    def set_up(self, env,num_episodes = 10, max_episode_length=None,load_dir = None, apply_norm = True, multi_process = True, logger = True,visualize = False, rand_seed = -1):
+    def set_up(self, env,num_episodes = 10, max_episode_length=1000,load_dir = None, apply_norm = True, multi_process = True, logger = True,visualize = False, rand_seed = -1):
         self.env_name = env
         self.num_episodes = num_episodes
-        self.max_episode_length = 1000
+        self.max_episode_length = max_episode_length
         self.load_dir = load_dir
         self.apply_norm = apply_norm
         self.multi_process = multi_process
@@ -137,22 +137,30 @@ class Evaluator(object):
     
 Singleton_evaluator = Evaluator()
 
-'''
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Eval DDPG')
-    parser.add_argument('--env', default='Pendulum-v0', type=str, help='open-ai gym environment')
+    #parser.add_argument('--env', default='Pendulum-v0', type=str, help='open-ai gym environment')
     parser.add_argument('--output', default='result/', type=str, help='result output dir')
+    parser.add_argument('--arg-file', default='args.txt', type=str, help='open-ai gym environment')
     parser.add_argument('--max-episode-length', default=500, type=int, help='')
     
     args = parser.parse_args()
-    output_dir = get_output_folder(args.output, args.env)
-    env = gym.make(args.env)
-    nb_actions = env.action_space.shape[0]
-    nb_states = env.observation_space.shape[0]
-    
-    eval = Evaluator(env,num_episodes = 1, max_episode_length=None, load_dir = output_dir)
-    eval.build_actor(nb_states, nb_actions)
-    mean,var = eval(visualize = True)
-    print(mean,var)
-'''
+    with open(os.path.join(args.output, args.arg_file),'r') as f:
+        argstr = f.read()
+        argstr = argstr.split('(')[1]
+        argstr = argstr.split(')')[0]
+        argstr_list = argstr.split(',')
+        args_dict = {argstr_item.split('=')[0].strip(): argstr_item.split('=')[1].strip().replace("'","") for argstr_item in argstr_list}
+    print(args_dict)
+    Singleton_evaluator.set_up(args_dict['env'],
+                               num_episodes = 10,
+                               max_episode_length=args.max_episode_length,
+                               load_dir = args.output,
+                               apply_norm = False,
+                               multi_process = False,
+                               logger = False,
+                               visualize = True,
+                               rand_seed = 666)
+    Singleton_evaluator.load_and_run(0)

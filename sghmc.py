@@ -115,7 +115,7 @@ class SGHMC(Optimizer):
                     v_hat.add_(-v_hat * r_t + r_t * (gradient ** 2))
                 #  }}} Burn-in updates #
 
-                lr_scaled = lr / torch.sqrt(scale_grad)
+                lr_scaled = (lr / torch.sqrt(scale_grad)).cuda()
 
                 #  Draw random sample {{{ #
 

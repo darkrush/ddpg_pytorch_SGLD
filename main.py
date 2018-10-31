@@ -101,25 +101,27 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='DDPG on pytorch')
     
-    parser.add_argument('--env', default='HalfCheetah-v2', type=str, help='open-ai gym environment')
-    parser.add_argument('--rand_seed', default=666, type=int, help='random_seed')
+    parser.add_argument('--env', default='Pendulum-v0', type=str, help='open-ai gym environment')
+    parser.add_argument('--rand_seed', default=314, type=int, help='random_seed')
     parser.add_argument('--nocuda', dest='with_cuda', action='store_false',help='disable cuda')
     parser.set_defaults(with_cuda=True)
     parser.add_argument('--actor-lr', default=0.0001, type=float, help='actor net learning rate')
     parser.add_argument('--critic-lr', default=0.001, type=float, help='critic net learning rate')
     parser.add_argument('--SGLD-mode', default=0, type=int, help='SGLD mode, 0: no SGLD, 1: actor sgld only, 2: critic sgld only, 3: both actor & critic')
-    parser.add_argument('--SGLD-coef', default=0.01, type=float, help='SGLD coef')
+    parser.add_argument('--num-pseudo-batches', default=1e6, type=int, help='SGLD pseude batch number')
+    
     parser.add_argument('--action-noise', dest='action_noise', action='store_true',help='enable action space noise')
-    parser.add_argument('--stddev', default=0.2, type=float, help='action noise stddev')
     parser.set_defaults(action_noise=False)
-    parser.add_argument('--noise-decay', default=0, type=float, help='action noise decay')
+    parser.add_argument('--l2-critic', default=0.01, type=float, help='critic l2 regularization')
+    parser.add_argument('--stddev', default=0.2, type=float, help='action noise stddev')
+    parser.add_argument('--noise-decay', default=1, type=float, help='action noise decay')
     parser.add_argument('--lr-decay', default=0, type=float, help='critic lr decay')
     parser.add_argument('--batch-size', default=128, type=int, help='minibatch size')
     parser.add_argument('--discount', default=0.99, type=float, help='reward discout')
     parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
     parser.add_argument('--warmup', default=100, type=int, help='time without training but only filling the replay memory')
     parser.add_argument('--output', default='result/', type=str, help='result output dir')
-    parser.add_argument('--exp-name', default='', type=str, help='exp dir name')
+    parser.add_argument('--exp-name', default='0', type=str, help='exp dir name')
     parser.add_argument('--obs-norm', dest='obs_norm', action='store_true',help='enable observation normalization')
     parser.set_defaults(obs_norm=False)
     parser.add_argument('--eval-visualize', dest='eval_visualize', action='store_true',help='enable render in evaluation progress')
@@ -173,7 +175,7 @@ if __name__ == "__main__":
 
     
     agent = DDPG(nb_actions = nb_actions,nb_states = nb_states, layer_norm = True, obs_norm = args.obs_norm,
-                 actor_lr = args.actor_lr, critic_lr = args.critic_lr,SGLD_coef = args.SGLD_coef,noise_decay = args.noise_decay,lr_decay = args.lr_decay, batch_size = args.batch_size,
+                 actor_lr = args.actor_lr, critic_lr = args.critic_lr, num_pseudo_batches = args.num_pseudo_batches,l2_critic = args.l2_critic, noise_decay = args.noise_decay,lr_decay = args.lr_decay, batch_size = args.batch_size,
                  discount = args.discount, tau = args.tau, pool_size = args.pool_size,
                  parameters_noise = None, action_noise = action_noise,SGLD_mode = args.SGLD_mode,pool_mode = args.pool_mode, with_cuda = args.with_cuda)
      
